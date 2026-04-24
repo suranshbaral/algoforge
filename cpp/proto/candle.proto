@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package algoforge;
+
+message Candle {
+    string  symbol       = 1;
+    double  open         = 2;
+    double  high         = 3;
+    double  low          = 4;
+    double  close        = 5;
+    double  volume       = 6;
+    int64   timestamp    = 7;
+    int32   interval_sec = 8;
+}
+
+message CandleBatch {
+    repeated Candle candles = 1;
+    string source           = 2;  // "synthetic", "alpaca", "yahoo"
+    int64  batch_timestamp  = 3;
+}
