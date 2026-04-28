@@ -1,31 +1,43 @@
 #include <iostream>
 #include <iomanip>
+#include <vector>
+#include <algorithm>
 #include <chrono>
 #include <thread>
-#include <vector>
 #include "candle.hpp"
 #include "ring_buffer.hpp"
 #include "candle_generator.hpp"
 #include "candle_publisher.hpp"
 #include "stats_engine.hpp"
 #include "fft.hpp"
+#include "fir_filter.hpp"
 
 using namespace algoforge;
 
 int main() {
-    std::cout << "AlgoForge engine starting...\n\n";
+    std::cout << "AlgoForge engine starting...\n" << std::flush;
 
     zmq::context_t ctx(1);
-
     CandleGenerator    gen("AAPL", 180.0, 0.5, 60, 42);
-    RingBuffer<128>    buffer;   // power of 2
+    RingBuffer<128>    buffer;
     CandlePublisher    publisher(ctx, "tcp://*:5555");
     RollingStatsEngine rolling_stats(20);
+
+    // Low-pass FIR — cutoff at 0.1 (filters out high frequency noise)
+    // 21 taps — good balance between smoothing and lag
+    FIRFilter fir(21, 0.1);
 
     std::vector<double> prices;
     int count = 0;
 
     std::cout << std::fixed << std::setprecision(4);
+    std::cout << std::setw(6)  << "N"
+              << std::setw(10) << "Raw"
+              << std::setw(10) << "Filtered"
+              << std::setw(10) << "Noise"
+              << std::setw(10) << "Z-Score"
+              << "\n";
+    std::cout << std::string(46, '-') << "\n";
 
     while (true) {
         Candle c = gen.next();
@@ -34,37 +46,32 @@ int main() {
         rolling_stats.update(c);
         prices.push_back(c.close);
         count++;
-        std::cout << "Candle " << count << " C=" << c.close << "\n" << std::flush;
 
-        // Run FFT every 64 candles
-        if (count % 64 == 0) {
-            // Take last 64 prices
+        // FIR filter output
+        double filtered;
+        bool ready = fir.update(c.close, filtered);
+
+        if (ready && rolling_stats.ready()) {
+            double noise   = c.close - filtered;
+            double zscore  = rolling_stats.zscore(c.close);
+
+            std::cout << std::setw(6)  << count
+                      << std::setw(10) << c.close
+                      << std::setw(10) << filtered
+                      << std::setw(10) << noise
+                      << std::setw(10) << zscore
+                      << "\n" << std::flush;
+        }
+
+        // FFT every 64 candles
+        if (count % 64 == 0 && (int)prices.size() >= 64) {
             std::vector<double> window(prices.end() - 64, prices.end());
-
             auto spectrum = FFT::power_spectrum(window);
             auto dom_bin  = FFT::dominant_frequency(spectrum);
             auto period   = FFT::bin_to_period(dom_bin, 64);
 
-            std::cout << "\n=== FFT Analysis at candle " << count << " ===\n";
-            std::cout << "Dominant frequency bin : " << dom_bin << "\n";
-            std::cout << "Dominant period        : " << period << " candles\n";
-            std::cout << "Rolling mean           : " << rolling_stats.mean() << "\n";
-            std::cout << "Rolling stddev         : " << rolling_stats.stddev() << "\n";
-            std::cout << "Rolling z-score        : " << rolling_stats.zscore(c.close) << "\n";
-
-            // Print top 5 frequency bins
-            std::cout << "\nTop 5 power bins:\n";
-            std::vector<std::pair<double,std::size_t>> bins;
-            for (std::size_t i = 1; i < spectrum.size(); i++)
-                bins.push_back({spectrum[i], i});
-            std::sort(bins.rbegin(), bins.rend());
-            for (int i = 0; i < 5; i++) {
-                std::cout << "  bin=" << std::setw(3) << bins[i].second
-                          << "  period=" << std::setw(8)
-                          << FFT::bin_to_period(bins[i].second, 64)
-                          << " candles"
-                          << "  power=" << bins[i].first << "\n";
-            }
+            std::cout << "\n=== FFT @ candle " << count
+                      << " | dominant period=" << period << " candles ===\n\n";
         }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(200));
