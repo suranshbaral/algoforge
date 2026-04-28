@@ -3,19 +3,20 @@
 #include <zmq.hpp>
 #include <nlohmann/json.hpp>
 #include <string>
+#include <iostream>
 #include "candle.hpp"
 
 namespace algoforge {
 
 class CandlePublisher {
 public:
-    // Shared context passed in — no context per publisher
-    CandlePublisher(zmq::context_t& ctx, const std::string& endpoint)
-        : socket_(ctx, zmq::socket_type::push)
-    {
-        socket_.bind(endpoint);
-    }
-
+  CandlePublisher(zmq::context_t& ctx, const std::string& endpoint)
+    : socket_(ctx, zmq::socket_type::push)
+{
+    int sndhwm = 0;  // infinite send buffer — never block
+    socket_.set(zmq::sockopt::sndhwm, sndhwm);
+    socket_.bind(endpoint);
+}
     void publish(const Candle& c) {
         nlohmann::json j;
         j["symbol"]       = c.symbol;
@@ -28,7 +29,12 @@ public:
         j["interval_sec"] = c.interval_sec;
 
         std::string msg = j.dump();
-        socket_.send(zmq::buffer(msg), zmq::send_flags::none);
+
+        try {
+            socket_.send(zmq::buffer(msg), zmq::send_flags::dontwait);
+        } catch (const zmq::error_t& e) {
+            // No subscriber connected — skip silently
+        }
     }
 
 private:
