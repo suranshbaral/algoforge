@@ -29,3 +29,9 @@ target_link_libraries(backtest
     CURL::libcurl
     nlohmann_json::nlohmann_json
 )
+add_executable(backtest_nokia src/backtest_nokia.cpp)
+target_link_libraries(backtest_nokia
+    ${ZMQ_LINK_LIBRARIES}
+    CURL::libcurl
+    nlohmann_json::nlohmann_json
+)

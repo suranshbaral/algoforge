@@ -2,6 +2,7 @@
 
 #include <queue>
 #include <vector>
+#include <string>
 #include <iostream>
 #include <iomanip>
 #include "event.hpp"
@@ -18,12 +19,14 @@ public:
     Backtester(double initial_cash,
                double zscore_entry  = 2.0,
                double zscore_exit   = 0.5,
-               double slippage_pct  = 0.001)
+               double slippage_pct  = 0.001,
+               std::string symbol   = "AAPL")
         : portfolio_(initial_cash)
         , initial_cash_(initial_cash)
         , zscore_entry_(zscore_entry)
         , zscore_exit_(zscore_exit)
         , slippage_(slippage_pct)
+        , symbol_(symbol)
         , stats_(20)
         , fir_(21, 0.1)
         , candle_count_(0)
@@ -52,9 +55,9 @@ public:
         }
 
         // Close any open positions at last price
-        if (portfolio_.position("AAPL") > 0) {
-            portfolio_.sell("AAPL", last_price_,
-                            portfolio_.position("AAPL"),
+        if (portfolio_.position(symbol_) > 0) {
+            portfolio_.sell(symbol_, last_price_,
+                            portfolio_.position(symbol_),
                             last_timestamp_);
         }
 
@@ -66,7 +69,7 @@ public:
             holding_periods.push_back(t.holding_candles);
         }
 
-        double final_equity = portfolio_.equity("AAPL", last_price_);
+        double final_equity = portfolio_.equity(symbol_, last_price_);
         perf_.print_summary(pnls, holding_periods, initial_cash_, final_equity);
     }
 
@@ -125,13 +128,14 @@ private:
     RollingStatsEngine stats_;
     FIRFilter          fir_;
 
-    double  initial_cash_;
-    double  zscore_entry_;
-    double  zscore_exit_;
-    double  slippage_;
-    int     candle_count_;
-    double  last_price_     = 0.0;
-    int64_t last_timestamp_ = 0;
+    double      initial_cash_;
+    double      zscore_entry_;
+    double      zscore_exit_;
+    double      slippage_;
+    std::string symbol_;
+    int         candle_count_;
+    double      last_price_     = 0.0;
+    int64_t     last_timestamp_ = 0;
 };
 
 } // namespace algoforge
