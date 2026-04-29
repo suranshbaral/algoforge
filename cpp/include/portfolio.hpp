@@ -17,6 +17,7 @@ struct Trade {
     int64_t     entry_time;
     int64_t     exit_time;
     double      pnl;
+    int         holding_candles = 0;
 };
 
 class Portfolio {
@@ -24,9 +25,11 @@ public:
     Portfolio(double initial_cash)
         : cash_(initial_cash)
         , initial_cash_(initial_cash)
+        , candle_count_(0)
     {}
 
-    // Execute a buy
+    void increment_candle() { candle_count_++; }
+
     bool buy(const std::string& symbol, double price,
              double qty, int64_t timestamp) {
         double cost = price * qty;
@@ -36,10 +39,11 @@ public:
         }
         if (qty <= 0) return false;
 
-        cash_              -= cost;
-        positions_[symbol] += qty;
-        entry_prices_[symbol] = price;
-        entry_times_[symbol]  = timestamp;
+        cash_                 -= cost;
+        positions_[symbol]    += qty;
+        entry_prices_[symbol]  = price;
+        entry_times_[symbol]   = timestamp;
+        entry_candles_[symbol] = candle_count_;
 
         std::cout << "  BUY  " << qty << " " << symbol
                   << " @ " << std::fixed << std::setprecision(2)
@@ -48,7 +52,6 @@ public:
         return true;
     }
 
-    // Execute a sell
     bool sell(const std::string& symbol, double price,
               double qty, int64_t timestamp) {
         if (positions_[symbol] <= 0) return false;
@@ -60,20 +63,21 @@ public:
         cash_              += proceeds;
         positions_[symbol] -= qty;
 
-        // Record trade
         Trade t;
-        t.symbol      = symbol;
-        t.entry_price = entry_prices_[symbol];
-        t.exit_price  = price;
-        t.quantity    = qty;
-        t.entry_time  = entry_times_[symbol];
-        t.exit_time   = timestamp;
-        t.pnl         = pnl;
+        t.symbol          = symbol;
+        t.entry_price     = entry_prices_[symbol];
+        t.exit_price      = price;
+        t.quantity        = qty;
+        t.entry_time      = entry_times_[symbol];
+        t.exit_time       = timestamp;
+        t.pnl             = pnl;
+        t.holding_candles = candle_count_ - entry_candles_[symbol];
         trades_.push_back(t);
 
         std::cout << "  SELL " << qty << " " << symbol
                   << " @ " << std::fixed << std::setprecision(2)
                   << price << " pnl=" << pnl
+                  << " holding=" << t.holding_candles << " candles"
                   << " cash=" << cash_ << "\n";
         return true;
     }
@@ -99,12 +103,15 @@ public:
     }
 
 private:
-    double cash_;
-    double initial_cash_;
-    std::unordered_map<std::string, double> positions_;
-    std::unordered_map<std::string, double> entry_prices_;
+    double  cash_;
+    double  initial_cash_;
+    int     candle_count_;
+
+    std::unordered_map<std::string, double>  positions_;
+    std::unordered_map<std::string, double>  entry_prices_;
     std::unordered_map<std::string, int64_t> entry_times_;
-    std::vector<Trade> trades_;
+    std::unordered_map<std::string, int>     entry_candles_;
+    std::vector<Trade>                       trades_;
 };
 
 } // namespace algoforge

@@ -29,14 +29,12 @@ public:
         , candle_count_(0)
     {}
 
-    // Load candles into the event queue
     void load(const std::vector<Candle>& candles) {
         for (const auto& c : candles)
             events_.push(make_candle_event(c));
         std::cout << "Loaded " << candles.size() << " candles\n\n";
     }
 
-    // Run the backtest
     void run() {
         std::cout << std::fixed << std::setprecision(2);
         std::cout << std::setw(6)  << "N"
@@ -60,13 +58,16 @@ public:
                             last_timestamp_);
         }
 
-        // Print results
+        // Collect results
         std::vector<double> pnls;
-        for (const auto& t : portfolio_.trades())
+        std::vector<int>    holding_periods;
+        for (const auto& t : portfolio_.trades()) {
             pnls.push_back(t.pnl);
+            holding_periods.push_back(t.holding_candles);
+        }
 
         double final_equity = portfolio_.equity("AAPL", last_price_);
-        perf_.print_summary(pnls, initial_cash_, final_equity);
+        perf_.print_summary(pnls, holding_periods, initial_cash_, final_equity);
     }
 
 private:
@@ -75,10 +76,10 @@ private:
 
         const Candle& c = e.candle;
         candle_count_++;
+        portfolio_.increment_candle();
         last_price_     = c.close;
         last_timestamp_ = c.timestamp;
 
-        // Update stats
         stats_.update(c);
         double filtered;
         bool fir_ready = fir_.update(c.close, filtered);
@@ -99,24 +100,16 @@ private:
                   << "\n";
 
         // Mean reversion strategy
-        // Z-score < -2 → price is cheap → BUY
         if (zscore <= -zscore_entry_ && position == 0) {
             double buy_price = c.close * (1 + slippage_);
-            double qty       = std::floor(portfolio_.cash() / buy_price * 0.95);
-            if (qty > 0) {
-                auto order = make_order_event(c.symbol, OrderSide::BUY,
-                                              qty, c.timestamp);
+            double qty = std::floor(portfolio_.cash() / buy_price * 0.95);
+            if (qty > 0)
                 portfolio_.buy(c.symbol, buy_price, qty, c.timestamp);
-            }
         }
-
-        // Z-score > -0.5 → price reverted → SELL
         else if (zscore >= -zscore_exit_ && position > 0) {
             double sell_price = c.close * (1 - slippage_);
             portfolio_.sell(c.symbol, sell_price, position, c.timestamp);
         }
-
-        // Z-score > +2 → price is expensive → SHORT (simplified: just don't hold)
         else if (zscore >= zscore_entry_ && position > 0) {
             double sell_price = c.close * (1 - slippage_);
             portfolio_.sell(c.symbol, sell_price, position, c.timestamp);
