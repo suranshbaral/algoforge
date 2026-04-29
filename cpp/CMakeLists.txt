@@ -8,18 +8,23 @@ list(APPEND CMAKE_PREFIX_PATH "/opt/homebrew")
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(ZMQ REQUIRED libzmq)
-
 find_package(CURL REQUIRED)
 find_package(nlohmann_json REQUIRED)
 
 include_directories(include)
 include_directories(${ZMQ_INCLUDE_DIRS})
 
-add_executable(algoforge
-    src/main.cpp
+# Main engine
+add_executable(algoforge src/main.cpp)
+target_link_libraries(algoforge
+    ${ZMQ_LINK_LIBRARIES}
+    CURL::libcurl
+    nlohmann_json::nlohmann_json
 )
 
-target_link_libraries(algoforge
+# Backtester
+add_executable(backtest src/backtest.cpp)
+target_link_libraries(backtest
     ${ZMQ_LINK_LIBRARIES}
     CURL::libcurl
     nlohmann_json::nlohmann_json
