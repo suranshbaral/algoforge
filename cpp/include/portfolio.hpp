@@ -101,7 +101,10 @@ public:
         for (const auto& t : trades_) pnl += t.pnl;
         return pnl;
     }
-
+double entry_price(const std::string& s) const {
+    auto it = entry_prices_.find(s);
+    return it == entry_prices_.end() ? 0.0 : it->second;
+}
 private:
     double  cash_;
     double  initial_cash_;

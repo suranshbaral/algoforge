@@ -2,7 +2,6 @@
 
 #include <string>
 #include <cstdint>
-#include <vector>
 #include <sstream>
 
 namespace algoforge {
@@ -37,21 +36,32 @@ inline std::string regime_to_string(RegimeType r) {
 }
 
 struct MarketState {
+    // Core regime
     RegimeType  current;
     RegimeType  previous;
-    double      confidence;       // 0.0 to 1.0
-    int         duration;         // candles in current state
-    int         started_at;       // candle number when state began
+    double      confidence;
+    int         duration;
+    int         started_at;
     std::string transition_reason;
-    double      avg_zscore;       // mean zscore during this regime
-    double      avg_noise;        // mean noise during this regime
-    double      fft_period;       // dominant FFT period when state began
+
+    // Statistical context
+    double      avg_zscore;
+    double      avg_noise;
+    double      fft_period;
     int64_t     timestamp;
 
-    // Running accumulators for confidence
-    double      zscore_sum  = 0.0;
-    double      noise_sum   = 0.0;
+    // Running accumulators
+    double      zscore_sum    = 0.0;
+    double      noise_sum     = 0.0;
     int         confirm_count = 0;
+
+    // Spectral context
+    double      spectral_entropy    = 1.0;
+    double      band_power_low      = 0.33;
+    double      band_power_mid      = 0.33;
+    double      band_power_high     = 0.33;
+    double      spectral_confidence = 0.0;
+    std::string spectral_regime     = "UNKNOWN";
 
     MarketState()
         : current(RegimeType::UNKNOWN)
@@ -67,15 +77,22 @@ struct MarketState {
 
     std::string summary() const {
         std::ostringstream oss;
-        oss << "State      : " << regime_to_string(current)      << "\n"
-            << "Previous   : " << regime_to_string(previous)     << "\n"
-            << "Confidence : " << confidence                      << "\n"
-            << "Duration   : " << duration << " candles\n"
-            << "Started at : candle " << started_at              << "\n"
-            << "Avg Z-Score: " << avg_zscore                     << "\n"
-            << "Avg Noise  : " << avg_noise                      << "\n"
-            << "FFT Period : " << fft_period << " candles\n"
-            << "Reason     : " << transition_reason               << "\n";
+        oss << "State          : " << regime_to_string(current)   << "\n"
+            << "Previous       : " << regime_to_string(previous)  << "\n"
+            << "Confidence     : " << confidence                   << "\n"
+            << "Duration       : " << duration << " candles\n"
+            << "Started at     : candle " << started_at           << "\n"
+            << "Avg Z-Score    : " << avg_zscore                  << "\n"
+            << "Avg Noise      : " << avg_noise                   << "\n"
+            << "FFT Period     : " << fft_period << " candles\n"
+            << "Spectral       : " << spectral_regime
+            << " entropy="        << spectral_entropy
+            << " conf="           << spectral_confidence          << "\n"
+            << "Band power     : "
+            << "low="             << band_power_low
+            << " mid="            << band_power_mid
+            << " high="           << band_power_high              << "\n"
+            << "Reason         : " << transition_reason           << "\n";
         return oss.str();
     }
 };

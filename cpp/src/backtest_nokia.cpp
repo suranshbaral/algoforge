@@ -45,7 +45,7 @@ int main() {
     std::cout << "Exit Z    : 0.5\n";
     std::cout << "Slippage  : 0.1%\n\n";
 
-    Backtester bt(10000.0, 2.0, 0.5, 0.001);
+    Backtester bt(10000.0, 2.0, 0.5, 0.001, 0.05, "NOK");
     bt.load(candles);
     bt.run();
 
