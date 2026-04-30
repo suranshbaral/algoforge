@@ -35,3 +35,9 @@ target_link_libraries(backtest_nokia
     CURL::libcurl
     nlohmann_json::nlohmann_json
 )
+add_executable(nokia_stats src/nokia_stats.cpp)
+target_link_libraries(nokia_stats
+    ${ZMQ_LINK_LIBRARIES}
+    CURL::libcurl
+    nlohmann_json::nlohmann_json
+)
